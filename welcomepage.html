@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="css/botstrap_modified.css" />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/responsive.css" />
+    <title>after login Home Page</title>
+  </head>
+  <body>
+    <div class="header">
+      <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+          <a class="navbar-brand" href="index.html">
+            <img src="assests/logo-white.png" alt="Logo" class="logoimg" />
+          </a>
+          <button
+            class="navbar-toggler"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent"
+            aria-expanded="false"
+            aria-label="Toggle navigation"
+          >
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+              <li class="nav-item">
+                <a class="nav-link active" aria-current="page" href="index.html"
+                  >Home</a
+                >
+              </li>
+              <li class="nav-item">
+                <a
+                  class="nav-link"
+                  type="Logout"
+                  href="https://magicpan-prod-user-pool.auth.ap-south-1.amazoncognito.com/error?client_id=5u64takcdgqdvm0rn8vk8d734c&redirect_uri=https://magicpan.in/index.html"
+                  >Logout</a
+                >
+              </li>
+            </ul>
+          </div>
+        </div>
+      </nav>
+    </div>
+    <div class="order">
+      <h3>
+        <center>Place Your <span class="yellowtext">Order</span> Here</center>
+      </h3>
+    </div>
+    <div class="appmenu" id="app">
+      <div class="left">
+        <h5>You will get WhatsApp updates regarding your order.</h5>
+        <h5>
+          Please contact us if you need any assistance. We are glad to help you.
+        </h5>
+        <br />
+        <form method="post" action="save_data.php">
+          <table id="dataTable">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Rate</th>
+                <th>Qty</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="3"><b>Total</b></td>
+                <td id="totalAmount">0</td>
+              </tr>
+            </tfoot>
+          </table>
+          <br />
+          <center>
+            <button type="submit" class="submitbtnwel">Submit</button>
+          </center>
+        </form>
+      </div>
+
+      <script>
+        document.addEventListener("DOMContentLoaded", function () {
+          const tableBody = document.querySelector("#dataTable tbody");
+          let totalAmount = 0;
+
+          // Function to update table
+          function updateTable() {
+            fetch("data.csv")
+              .then((response) => {
+                if (!response.ok) {
+                  throw new Error("Network response was not ok");
+                }
+                return response.text();
+              })
+              .then((csvData) => {
+                // Check if table body already has rows
+                if (tableBody.children.length === 0) {
+                  const rows = csvData.split("\n");
+                  rows.forEach((row) => {
+                    const [item, rate] = row.split(",");
+                    const newRow = document.createElement("tr");
+
+                    // Create cells for item, rate, quantity, and amount
+                    const cellItem = document.createElement("td");
+                    cellItem.textContent = item;
+                    newRow.appendChild(cellItem);
+
+                    const cellRate = document.createElement("td");
+                    cellRate.textContent = rate;
+                    newRow.appendChild(cellRate);
+
+                    const cellQty = document.createElement("td");
+                    const qtyInput = document.createElement("input");
+                    qtyInput.type = "number";
+                    qtyInput.min = "0";
+                    qtyInput.value = "0";
+
+                    // Add event listeners only once per input
+                    qtyInput.addEventListener("input", function () {
+                      calculateAmount(newRow);
+                    });
+                    qtyInput.addEventListener("blur", function () {
+                      calculateAmount(newRow);
+                    });
+                    cellQty.appendChild(qtyInput);
+                    newRow.appendChild(cellQty);
+
+                    const cellAmount = document.createElement("td");
+                    cellAmount.textContent = "0";
+                    newRow.appendChild(cellAmount);
+
+                    tableBody.appendChild(newRow);
+                  });
+                }
+
+                // Update total amount
+                updateTotal();
+              })
+              .catch((error) => {
+                console.error("Error fetching CSV file:", error);
+              });
+          }
+
+          // Function to calculate amount
+          function calculateAmount(row) {
+            const rate = row.cells[1].textContent;
+            const qty = parseInt(row.cells[2].querySelector("input").value);
+            const amount = qty * parseFloat(rate);
+            row.cells[3].textContent = amount.toFixed(2);
+
+            // Update total amount
+            updateTotal();
+          }
+
+          // Function to update total amount
+          function updateTotal() {
+            totalAmount = 0;
+            tableBody.querySelectorAll("tr").forEach((row) => {
+              totalAmount += parseFloat(row.cells[3].textContent);
+            });
+            document.getElementById("totalAmount").textContent =
+              totalAmount.toFixed(2);
+          }
+
+          // Call updateTable function initially and periodically
+          updateTable();
+          setInterval(updateTable, 5000); // Update every 5 seconds
+        });
+
+        // Function to save data to MySQL database using AJAX
+        function saveDataToDatabase() {
+          const tableRows = document.querySelectorAll("#dataTable tbody tr");
+          const data = [];
+
+          tableRows.forEach((row) => {
+            const item = row.cells[0].textContent;
+            const rate = row.cells[1].textContent;
+            const qty = row.cells[2].querySelector("input").value;
+            const amount = row.cells[3].textContent;
+            data.push({ item, rate, qty, amount });
+          });
+
+          const xhr = new XMLHttpRequest();
+          const url = "save_data.php";
+          const params = "data=" + JSON.stringify(data);
+
+          xhr.open("POST", url, true);
+          xhr.setRequestHeader(
+            "Content-type",
+            "application/x-www-form-urlencoded"
+          );
+
+          xhr.onreadystatechange = function () {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+              if (xhr.status === 200) {
+                console.log("Data saved successfully");
+              } else {
+                console.error("Error saving data:", xhr.statusText);
+              }
+            }
+          };
+
+          xhr.send(params);
+        }
+
+        // Call the function to save data when Submit button is clicked
+        const submitBtn = document.querySelector(".submitbtnwel");
+        submitBtn.addEventListener("click", saveDataToDatabase);
+      </script>
+      <img src="assests/imageoftheday.jpg" alt="app" class="appImg" />
+    </div>
+    <div class="footer">
+      <footer>© 2024 MagicPan</footer>
+    </div>
+  </body>
+</html>
